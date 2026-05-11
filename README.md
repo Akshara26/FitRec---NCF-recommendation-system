@@ -1,73 +1,125 @@
-# neural-collaborative-filtering
-Neural collaborative filtering(NCF), is a deep learning based framework for making recommendations. The key idea is to learn the user-item interaction using neural networks. Check the follwing paper for details about NCF.
+# FitRec: Personalized Fitness Activity Recommender
 
-> He, Xiangnan, et al. "Neural collaborative filtering." Proceedings of the 26th International Conference on World Wide Web. International World Wide Web Conferences Steering Committee, 2017.
+## Business Problem
+Gym members often stick to familiar workout routines, missing activities better suited to their fitness goals. A personalized recommendation system can surface the right workout type for each member based on their behavior — increasing engagement, retention, and training outcomes. This project builds an end-to-end Neural Collaborative Filtering (NCF) recommendation system trained on gym member workout data, with a retraining loop that adapts to new user behavior over time.
 
-The authors of NCF actually published [a nice implementation](https://github.com/hexiangnan/neural_collaborative_filtering) written in tensorflow(keras). This repo instead provides my implementation written in **pytorch**. I hope it would be helpful to pytorch fans. Have fun playing with it!
+---
 
-## Run!
-```bash
-python train.py
+## Architecture
+
+The model is based on **Neural Matrix Factorization (NeuMF)**, which combines two pathways:
+
 ```
-modify the config in `train.py` to change the hyper-parameters.
+User ID ──► User Embedding (GMF) ──► Element-wise Product ──►
+Item ID ──► Item Embedding (GMF)                             │
+                                                             ├──► Concat ──► Sigmoid ──► Score
+User ID ──► User Embedding (MLP) ──► Concat ──► Hidden ──►  │
+Item ID ──► Item Embedding (MLP)    Layers                  │
+```
+
+- **GMF pathway** — element-wise product of user and item embeddings captures linear interactions
+- **MLP pathway** — concatenated embeddings passed through hidden layers captures non-linear interactions
+- **NeuMF** — both pathways concatenated into a single sigmoid output (probability of interaction)
+
+Implicit feedback is derived from workout frequency — members who train 4+ days/week are treated as engaged (rating=1), others as non-engaged (rating=0). This is closer to how production recommendation systems work than explicit ratings.
+
+---
 
 ## Dataset
-[The Movielens 1M Dataset](http://grouplens.org/datasets/movielens/1m/) is used to test the repo.
+- **Source**: [Gym Members Exercise Dataset](https://www.kaggle.com/datasets/valakhorasani/gym-members-exercise-dataset)
+- **Size**: 973 members, 4 workout types (Yoga, HIIT, Cardio, Strength)
+- **Interaction matrix sparsity**: 75%
+- **Implicit feedback signal**: Workout frequency ≥ 4 days/week = 1, else 0
 
-## Files
+---
 
-> `data.py`: prepare train/test dataset
->
-> `utils.py`: some handy functions for model training etc.
->
-> `metrics.py`: evaluation metrics including hit ratio(HR) and NDCG
->
-> `gmf.py`: generalized matrix factorization model
->
-> `mlp.py`: multi-layer perceptron model
->
-> `neumf.py`: fusion of gmf and mlp
->
-> `engine.py`: training engine
->
-> `train.py`: entry point for train a NCF model
+## Results
 
-## Performance
-The hyper params are not tuned. Better performance can be achieved with careful tuning, especially for the MLP model. Pretraining the user embedding & item embedding might be helpful to improve the performance of the MLP model. 
+| Metric | Popularity Baseline | NeuMF |
+|--------|-------------------|-------|
+| HR@3 | 0.2045 | 0.7692 |
+| NDCG@3 | — | 0.5302 |
 
-Experiments' results with `num_negative_samples = 4` and `dim_latent_factor=8`  are shown as follows
+NeuMF is **4x better** than the popularity baseline on HR@3, justifying the use of personalized collaborative filtering over a simple popularity-based approach.
 
-![GMF V.S. MLP](./res/figure/factor8neg4.png)
+---
 
-Note that the MLP model was trained from scratch but the authors suggest that the performance might be boosted by pretrain the embedding layer with GMF model.
+## Retraining & Drift Monitoring
 
-![NeuMF pretrain V.S no pretrain](./res/figure/neumf_factor8neg4.png)
+Production recommendation systems degrade over time as user behavior shifts. Notebook 3 implements a retraining loop that:
 
-The pretrained version converges much faster.
+1. **Simulates a new interaction batch** — 200 new interactions with a shifted workout distribution
+2. **Detects drift** using `scipy.stats.ks_2samp()` comparing the new batch against the original training distribution
+3. **Fine-tunes the model** for 5 epochs at a 10x smaller learning rate (1e-4) to avoid catastrophic forgetting
+4. **Logs before/after metrics** to CSV for tracking model performance over time
 
-### L2 regularization for GMF model
-Large l2 regularization might lead to the bug of  `HR=0.0 NDCG=0.0`
+### Drift Detection Result
+| Metric | Value |
+|--------|-------|
+| KS Statistic | 0.1550 |
+| P-value | 0.0002 |
+| Drift Detected | ✅ Yes |
 
-### L2 regularization for MLP model
-a bit l2 regulzrization seems to improve the performance of the MLP model
+A p-value below 0.05 triggers a retraining run. In this case, a shift toward Cardio workouts was successfully detected.
 
-![L2 for MLP](./res/figure/mlp_l2_reg.png)
+---
 
-### MLP with pretrained user/item embedding
-Pre-training the MLP model with user/item embedding from the trained GMF gives better result.
+## Project Structure
 
-MLP network size = [16, 64, 32, 16, 8]
+```
+neural-collaborative-filtering/
+├── notebook0_eda.ipynb              # Exploratory data analysis
+├── notebook1_preprocessing.ipynb   # Data preprocessing + S3 upload
+├── notebook2_training.ipynb        # Model training + evaluation
+├── notebook3_retraining.ipynb      # Retraining loop + drift detection
+├── src/
+│   ├── neumf.py                    # NeuMF architecture
+│   ├── gmf.py                      # GMF pathway
+│   ├── mlp.py                      # MLP pathway
+│   ├── engine.py                   # Training engine
+│   └── data/
+│       ├── gym_members_exercise_tracking.csv
+│       ├── fitness_ratings.csv
+│       ├── train.csv
+│       ├── val.csv
+│       └── test.csv
+├── checkpoints/
+│   ├── neumf_fitness_final.pt
+│   └── neumf_fitness_retrained.pt
+└── requirements.txt
+```
 
-![Pretrain for MLP](./res/figure/mlp_pretrain_hr.png)
-![Pretrain for MLP](./res/figure/mlp_pretrain_ndcg.png)
+---
 
-### Implicit feedback without pretrain
-Ratings are set to 1 (interacted) or 0 (uninteracted). Train from scratch.
-![binarize](./res/figure/binarize.png) 
+## Setup
 
-## CPU training
-The code can also run on CPUs and actually pretty fast for small datasets.
+```bash
+# Clone the repo
+git clone https://github.com/yihong-chen/neural-collaborative-filtering.git
+cd neural-collaborative-filtering
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install torch pandas numpy scikit-learn boto3 papermill jupyter tensorboardX scipy matplotlib
+
+# Run notebooks in order
+# notebook0_eda.ipynb
+# notebook1_preprocessing.ipynb
+# notebook2_training.ipynb
+# notebook3_retraining.ipynb
+```
+
+---
+
 ## Requirements
-The repo works under torch 1.0 (gpu&cpu) and torch 2.3.1(cpu, gpu yet to be tested). You can find the old versions in **tags**.
-
+- Python 3.10+
+- PyTorch 2.x
+- pandas, numpy, scikit-learn
+- boto3 (S3 upload)
+- scipy (drift detection)
+- matplotlib (EDA visualizations)
+- tensorboardX
 

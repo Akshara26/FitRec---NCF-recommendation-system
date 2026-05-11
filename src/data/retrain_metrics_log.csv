@@ -1,0 +1,2 @@
+run,HR@10_before,NDCG@10_before,HR@10_after,NDCG@10_after
+retrain_1,1.0,0.6117229527488739,1.0,0.6117229527488739

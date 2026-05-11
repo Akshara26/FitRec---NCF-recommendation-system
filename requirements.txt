@@ -1,0 +1,10 @@
+torch
+pandas
+numpy
+scikit-learn
+boto3
+papermill
+jupyter
+tensorboardX
+scipy
+matplotlib

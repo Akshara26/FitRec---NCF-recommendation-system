@@ -5,3 +5,15 @@ src/runs
 src/checkpoints
 res/.ipynb_checkpoints
 
+# TensorBoard logs
+runs/
+
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter checkpoints
+.ipynb_checkpoints/

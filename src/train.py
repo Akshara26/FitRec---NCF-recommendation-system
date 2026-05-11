@@ -6,7 +6,7 @@ from neumf import NeuMFEngine
 from data import SampleGenerator
 
 gmf_config = {'alias': 'gmf_factor8neg4-implict',
-              'num_epoch': 200,
+              'num_epoch': 5,
               'batch_size': 1024,
               # 'optimizer': 'sgd',
               # 'sgd_lr': 1e-3,
@@ -48,7 +48,7 @@ mlp_config = {'alias': 'mlp_factor8neg4_bz256_166432168_pretrain_reg_0.0000001',
               'model_dir': 'checkpoints/{}_Epoch{}_HR{:.4f}_NDCG{:.4f}.model'}
 
 neumf_config = {'alias': 'neumf_factor8neg4',
-                'num_epoch': 200,
+                'num_epoch': 5,
                 'batch_size': 1024,
                 'optimizer': 'adam',
                 'adam_lr': 1e-3,
@@ -82,6 +82,10 @@ ml1m_rating = pd.merge(ml1m_rating, item_id, on=['mid'], how='left')
 ml1m_rating = ml1m_rating[['userId', 'itemId', 'rating', 'timestamp']]
 print('Range of userId is [{}, {}]'.format(ml1m_rating.userId.min(), ml1m_rating.userId.max()))
 print('Range of itemId is [{}, {}]'.format(ml1m_rating.itemId.min(), ml1m_rating.itemId.max()))
+
+print(ml1m_rating.head(10))
+print(ml1m_rating.describe())
+
 # DataLoader for training
 sample_generator = SampleGenerator(ratings=ml1m_rating)
 evaluate_data = sample_generator.evaluate_data
@@ -90,12 +94,13 @@ evaluate_data = sample_generator.evaluate_data
 # engine = GMFEngine(config)
 # config = mlp_config
 # engine = MLPEngine(config)
-config = neumf_config
-engine = NeuMFEngine(config)
-for epoch in range(config['num_epoch']):
-    print('Epoch {} starts !'.format(epoch))
-    print('-' * 80)
-    train_loader = sample_generator.instance_a_train_loader(config['num_negative'], config['batch_size'])
-    engine.train_an_epoch(train_loader, epoch_id=epoch)
-    hit_ratio, ndcg = engine.evaluate(evaluate_data, epoch_id=epoch)
-    engine.save(config['alias'], epoch, hit_ratio, ndcg)
+
+# config = neumf_config
+# engine = NeuMFEngine(config)
+# for epoch in range(config['num_epoch']):
+#     print('Epoch {} starts !'.format(epoch))
+#     print('-' * 80)
+#     train_loader = sample_generator.instance_a_train_loader(config['num_negative'], config['batch_size'])
+#     engine.train_an_epoch(train_loader, epoch_id=epoch)
+#     hit_ratio, ndcg = engine.evaluate(evaluate_data, epoch_id=epoch)
+#     engine.save(config['alias'], epoch, hit_ratio, ndcg)
