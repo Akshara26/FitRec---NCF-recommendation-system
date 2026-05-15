@@ -1,6 +1,5 @@
 # FitRec: Personalized Fitness Activity Recommender
 
-## Business Problem
 Gym members often stick to familiar workout routines, missing activities better suited to their fitness goals. A personalized recommendation system can surface the right workout type for each member based on their behavior — increasing engagement, retention, and training outcomes. This project builds an end-to-end Neural Collaborative Filtering (NCF) recommendation system trained on gym member workout data, with a retraining loop that adapts to new user behavior over time.
 
 ---
